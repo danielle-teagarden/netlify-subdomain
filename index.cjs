@@ -215,7 +215,7 @@ async function removeDomainFromSite(domain) {
     });
     
     const records = JSON.parse(recordsResult);
-    const record = records.find(r => r.hostname === subdomain && r.type === 'CNAME');
+    const record = records.find(r => r.hostname === domain && r.type === 'CNAME');
     
     if (!record) {
       console.error(`❌ DNS record for ${subdomain} not found`);

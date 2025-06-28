@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.2] - 2024-12-28
+
+### Fixed
+- Fixed site ID detection logic to properly handle site names with hyphens
+- Fixed remove command to correctly match DNS records by full hostname
+- Better user guidance when domain alias API fails
+
+### Improved
+- Always fetch site info to get correct default domain
+- Clearer instructions for manual domain alias setup when needed
+
 ## [1.0.1] - 2024-12-28
 
 ### Fixed

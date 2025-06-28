@@ -1,6 +1,6 @@
 {
   "name": "netlify-subdomain",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "CLI tool to manage Netlify subdomains without the web UI",
   "main": "index.cjs",
   "bin": {
