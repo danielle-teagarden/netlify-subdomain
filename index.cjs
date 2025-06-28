@@ -104,9 +104,45 @@ async function addDomainToSite(domain, siteId) {
     });
     
     // Now add the domain alias to the site
-    const aliasResult = execSync(`curl -s -X POST -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" -d '{"domain":"${domain}"}' https://api.netlify.com/api/v1/sites/${siteId}/domain_aliases`, {
-      encoding: 'utf8'
-    });
+    try {
+      const aliasResult = execSync(`curl -s -w "\\nHTTP_STATUS:%{http_code}" -X POST -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" -d '{"domain":"${domain}"}' https://api.netlify.com/api/v1/sites/${siteId}/domain_aliases`, {
+        encoding: 'utf8'
+      });
+      
+      // Extract HTTP status code
+      const statusMatch = aliasResult.match(/HTTP_STATUS:(\d+)/);
+      const httpStatus = statusMatch ? parseInt(statusMatch[1]) : 0;
+      const responseBody = aliasResult.replace(/\nHTTP_STATUS:\d+/, '');
+      
+      // Check if the result is an error
+      let aliasData;
+      try {
+        aliasData = JSON.parse(responseBody);
+      } catch (e) {
+        // If we can't parse, check HTTP status
+        if (httpStatus >= 200 && httpStatus < 300) {
+          aliasData = {};
+        } else {
+          console.log(`⚠️  Domain alias API returned status ${httpStatus}`);
+          aliasData = { error: 'Non-JSON response' };
+        }
+      }
+      
+      if (aliasData.error || aliasData.code === 422 || httpStatus >= 400) {
+        console.log(`⚠️  Note: Domain alias may already exist or there was an issue adding it`);
+        console.log(`   HTTP Status: ${httpStatus}`);
+        if (aliasData.error) {
+          console.log(`   Error: ${aliasData.error}`);
+        }
+        if (aliasData.message) {
+          console.log(`   Message: ${aliasData.message}`);
+        }
+        console.log(`   You may need to add the domain alias manually in the Netlify UI`);
+      }
+    } catch (aliasError) {
+      console.log(`⚠️  DNS record created but couldn't add domain alias to site`);
+      console.log(`   You may need to add it manually in the Netlify UI`);
+    }
     
     console.log(`✅ Successfully added ${domain}!`);
     console.log(`🌐 Your site will be available at: https://${domain}`);

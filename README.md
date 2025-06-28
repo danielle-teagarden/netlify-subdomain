@@ -1,5 +1,10 @@
 # netlify-subdomain
 
+[![npm version](https://badge.fury.io/js/netlify-subdomain.svg)](https://badge.fury.io/js/netlify-subdomain)
+[![npm downloads](https://img.shields.io/npm/dt/netlify-subdomain.svg)](https://www.npmjs.com/package/netlify-subdomain)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub stars](https://img.shields.io/github/stars/danielle-teagarden/netlify-subdomain.svg)](https://github.com/danielle-teagarden/netlify-subdomain/stargazers)
+
 A CLI tool to manage Netlify subdomains without using the web UI. Perfect for developers who prefer the command line.
 
 ## Features

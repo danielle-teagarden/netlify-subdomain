@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.1] - 2024-12-28
+
+### Fixed
+- Improved error handling for domain alias API calls
+- Added HTTP status code checking for better debugging
+- More informative error messages when domain alias addition fails
+- Better detection of API failures that were previously silent
+
 ## [1.0.0] - 2024-12-28
 
 ### Added
