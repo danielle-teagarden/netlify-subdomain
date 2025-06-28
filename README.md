@@ -7,6 +7,8 @@
 
 A CLI tool to manage Netlify subdomains without using the web UI. Perfect for developers who prefer the command line.
 
+**🎉 v1.1.0 Update: Full automation! No more manual steps in the Netlify UI!**
+
 ## Features
 
 - ✅ Add subdomains to any Netlify site from the command line

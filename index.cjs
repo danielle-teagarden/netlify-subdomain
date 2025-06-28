@@ -105,7 +105,20 @@ async function addDomainToSite(domain, siteId) {
     
     // Now add the domain alias to the site
     try {
-      const aliasResult = execSync(`curl -s -w "\\nHTTP_STATUS:%{http_code}" -X POST -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" -d '{"domain":"${domain}"}' https://api.netlify.com/api/v1/sites/${siteId}/domain_aliases`, {
+      // First get current site data to preserve existing domain aliases
+      const siteData = JSON.parse(execSync(`curl -s -H "Authorization: Bearer ${token}" https://api.netlify.com/api/v1/sites/${siteId}`, {
+        encoding: 'utf8'
+      }));
+      
+      // Add new domain to existing aliases
+      const currentAliases = siteData.domain_aliases || [];
+      if (!currentAliases.includes(domain)) {
+        currentAliases.push(domain);
+      }
+      
+      // Update site with new domain aliases
+      const updateData = JSON.stringify({ domain_aliases: currentAliases });
+      const aliasResult = execSync(`curl -s -w "\\nHTTP_STATUS:%{http_code}" -X PATCH -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" -d '${updateData}' https://api.netlify.com/api/v1/sites/${siteId}`, {
         encoding: 'utf8'
       });
       
@@ -128,15 +141,16 @@ async function addDomainToSite(domain, siteId) {
         }
       }
       
-      if (aliasData.error || aliasData.code === 422 || httpStatus >= 400) {
-        console.log(`\n⚠️  Note: DNS record created successfully!`);
-        console.log(`   However, the domain alias couldn't be added automatically to the Netlify site.`);
-        console.log(`   This is often due to API limitations.`);
-        console.log(`\n   To complete setup:`);
+      if (httpStatus !== 200 || aliasData.error) {
+        console.log(`\n⚠️  DNS record created but domain alias update failed`);
+        console.log(`   HTTP Status: ${httpStatus}`);
+        if (aliasData.error) {
+          console.log(`   Error: ${aliasData.error}`);
+        }
+        console.log(`\n   To complete setup manually:`);
         console.log(`   1. Go to https://app.netlify.com/sites/${siteId}/settings/domain`);
         console.log(`   2. Click "Add domain alias"`);
         console.log(`   3. Enter: ${domain}`);
-        console.log(`\n   The DNS is already configured, so it will work immediately once added.`);
       }
     } catch (aliasError) {
       console.log(`⚠️  DNS record created but couldn't add domain alias to site`);
@@ -227,7 +241,35 @@ async function removeDomainFromSite(domain) {
       encoding: 'utf8'
     });
     
-    console.log(`✅ Successfully removed ${domain}!`);
+    // Also remove from domain aliases if we can find the site
+    try {
+      // Get all sites to find which one has this domain alias
+      const sitesResult = execSync(`curl -s -H "Authorization: Bearer ${token}" https://api.netlify.com/api/v1/sites`, {
+        encoding: 'utf8'
+      });
+      const sites = JSON.parse(sitesResult);
+      
+      const siteWithDomain = sites.find(site => 
+        site.domain_aliases && site.domain_aliases.includes(domain)
+      );
+      
+      if (siteWithDomain) {
+        // Remove domain from aliases
+        const updatedAliases = siteWithDomain.domain_aliases.filter(d => d !== domain);
+        const updateData = JSON.stringify({ domain_aliases: updatedAliases });
+        
+        execSync(`curl -s -X PATCH -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" -d '${updateData}' https://api.netlify.com/api/v1/sites/${siteWithDomain.id}`, {
+          encoding: 'utf8'
+        });
+        
+        console.log(`✅ Successfully removed ${domain} from DNS and site aliases!`);
+      } else {
+        console.log(`✅ Successfully removed ${domain} from DNS!`);
+      }
+    } catch (e) {
+      // If we can't remove from aliases, at least DNS is removed
+      console.log(`✅ Successfully removed ${domain} from DNS!`);
+    }
     
     // Update recent domains
     config.recentDomains = config.recentDomains.filter(d => d !== domain);

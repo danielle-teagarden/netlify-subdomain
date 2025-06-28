@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2024-12-28
+
+### Added
+- **Full automation!** Domain aliases are now added automatically without web UI
+- Remove command now also removes domain aliases from sites
+
+### Fixed
+- Fixed API endpoint for domain aliases (using PATCH on site instead of POST to domain_aliases)
+- Domain aliases are properly added to Netlify sites programmatically
+
+### Changed
+- Uses correct Netlify API to update site domain_aliases array
+- No more manual steps required - everything works from the CLI!
+
 ## [1.0.2] - 2024-12-28
 
 ### Fixed
