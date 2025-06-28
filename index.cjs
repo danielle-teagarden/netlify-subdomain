@@ -85,15 +85,15 @@ async function addDomainToSite(domain, siteId) {
     
     // Get the target domain for the site
     let targetDomain;
-    if (siteId.includes('-')) {
-      // It's a site ID, need to fetch info
+    // Always fetch site info to get the correct default domain
+    try {
       const siteInfo = JSON.parse(execSync(`curl -s -H "Authorization: Bearer ${token}" https://api.netlify.com/api/v1/sites/${siteId}`, {
         encoding: 'utf8'
       }));
       targetDomain = siteInfo.default_domain;
-    } else {
-      // It's already a site name, construct the domain
-      targetDomain = `${siteId}.netlify.app`;
+    } catch (e) {
+      console.error('❌ Failed to fetch site information');
+      return;
     }
     
     console.log(`📝 Adding CNAME: ${subdomain} → ${targetDomain}`);
@@ -129,15 +129,14 @@ async function addDomainToSite(domain, siteId) {
       }
       
       if (aliasData.error || aliasData.code === 422 || httpStatus >= 400) {
-        console.log(`⚠️  Note: Domain alias may already exist or there was an issue adding it`);
-        console.log(`   HTTP Status: ${httpStatus}`);
-        if (aliasData.error) {
-          console.log(`   Error: ${aliasData.error}`);
-        }
-        if (aliasData.message) {
-          console.log(`   Message: ${aliasData.message}`);
-        }
-        console.log(`   You may need to add the domain alias manually in the Netlify UI`);
+        console.log(`\n⚠️  Note: DNS record created successfully!`);
+        console.log(`   However, the domain alias couldn't be added automatically to the Netlify site.`);
+        console.log(`   This is often due to API limitations.`);
+        console.log(`\n   To complete setup:`);
+        console.log(`   1. Go to https://app.netlify.com/sites/${siteId}/settings/domain`);
+        console.log(`   2. Click "Add domain alias"`);
+        console.log(`   3. Enter: ${domain}`);
+        console.log(`\n   The DNS is already configured, so it will work immediately once added.`);
       }
     } catch (aliasError) {
       console.log(`⚠️  DNS record created but couldn't add domain alias to site`);
@@ -294,12 +293,17 @@ Note: The base domain must be managed by Netlify DNS for this to work.
       const fullDomain = subdomain.includes('.') ? subdomain : `${subdomain}.${baseDomain}`;
       
       let siteId = siteName;
-      if (siteName && !siteName.includes('-')) {
-        // It's a site name, not ID
-        siteId = await getSiteId(siteName);
-        if (!siteId) {
-          console.error(`❌ Site not found: ${siteName}`);
-          return;
+      if (siteName) {
+        // Check if it's a UUID (site ID) or a site name
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(siteName);
+        
+        if (!isUUID) {
+          // It's a site name, need to look up the ID
+          siteId = await getSiteId(siteName);
+          if (!siteId) {
+            console.error(`❌ Site not found: ${siteName}`);
+            return;
+          }
         }
       }
       
