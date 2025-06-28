@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2025-06-28
+
+### Added
+- Automatic git repository detection to find matching Netlify sites
+- Better error messages with actionable suggestions
+- Check for existing DNS records before creating new ones
+- Update existing DNS records if pointing to wrong target
+
+### Improved
+- Smarter site detection when no site is specified
+- More helpful guidance when site isn't found
+- Better handling of edge cases
+
 ## [1.1.1] - 2025-06-28
 
 ### Fixed

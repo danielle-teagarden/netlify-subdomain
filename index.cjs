@@ -98,6 +98,34 @@ async function addDomainToSite(domain, siteId) {
     
     console.log(`📝 Adding CNAME: ${subdomain} → ${targetDomain}`);
     
+    // Check if DNS record already exists
+    try {
+      const existingRecords = execSync(`curl -s -H "Authorization: Bearer ${token}" https://api.netlify.com/api/v1/dns_zones/${zone.id}/dns_records`, {
+        encoding: 'utf8'
+      });
+      
+      const records = JSON.parse(existingRecords);
+      const existingRecord = records.find(r => r.hostname === subdomain && r.type === 'CNAME');
+      
+      if (existingRecord) {
+        console.log(`\n⚠️  DNS record already exists for ${subdomain}`);
+        console.log(`   Current target: ${existingRecord.value}`);
+        
+        if (existingRecord.value !== targetDomain) {
+          console.log(`   Updating to point to: ${targetDomain}`);
+          
+          // Delete the old record
+          execSync(`curl -s -X DELETE -H "Authorization: Bearer ${token}" https://api.netlify.com/api/v1/dns_zones/${zone.id}/dns_records/${existingRecord.id}`, {
+            encoding: 'utf8'
+          });
+        } else {
+          console.log(`   Already pointing to correct target`);
+        }
+      }
+    } catch (e) {
+      // Continue if we can't check existing records
+    }
+    
     // Create DNS record
     const dnsResult = execSync(`curl -s -X POST -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" -d '{"type":"CNAME","hostname":"${subdomain}","value":"${targetDomain}","ttl":3600}' https://api.netlify.com/api/v1/dns_zones/${zone.id}/dns_records`, {
       encoding: 'utf8'
@@ -212,8 +240,8 @@ async function addDomainToSite(domain, siteId) {
   }
 }
 
-// Get site ID by name
-async function getSiteId(siteName) {
+// Get all sites
+async function getAllSites() {
   const token = getNetlifyToken();
   
   try {
@@ -221,24 +249,28 @@ async function getSiteId(siteName) {
       encoding: 'utf8'
     });
     
-    const sites = JSON.parse(result);
-    const site = sites.find(s => s.name === siteName);
-    
-    if (site) {
-      return site.id;
-    }
-    
-    // Try to find by custom domain
-    const siteByDomain = sites.find(s => 
-      s.custom_domain === siteName || 
-      s.default_domain === siteName
-    );
-    
-    return siteByDomain ? siteByDomain.id : null;
+    return JSON.parse(result);
   } catch (error) {
     console.error('Error fetching sites:', error.message);
-    return null;
+    return [];
   }
+}
+
+// Get site ID by name
+async function getSiteId(siteName) {
+  const sites = await getAllSites();
+  
+  // Try exact name match first
+  const site = sites.find(s => s.name === siteName);
+  if (site) return site.id;
+  
+  // Try by custom domain
+  const siteByDomain = sites.find(s => 
+    s.custom_domain === siteName || 
+    s.default_domain === siteName
+  );
+  
+  return siteByDomain ? siteByDomain.id : null;
 }
 
 // Remove domain from site
@@ -393,17 +425,64 @@ Note: The base domain must be managed by Netlify DNS for this to work.
       }
       
       if (!siteId) {
-        // Try to get from current directory
+        // Check if we're in a git repo
+        let repoInfo = null;
+        try {
+          const remoteUrl = execSync('git remote get-url origin 2>/dev/null', { encoding: 'utf8' }).trim();
+          const repoMatch = remoteUrl.match(/github\.com[/:]([\w-]+)\/([\w-]+)/);
+          if (repoMatch) {
+            repoInfo = {
+              owner: repoMatch[1],
+              name: repoMatch[2].replace('.git', '')
+            };
+            console.log(`📁 Found git repository: ${repoInfo.owner}/${repoInfo.name}`);
+          }
+        } catch (e) {
+          // Not in a git repo or no remote
+        }
+        
+        // Try to get from current directory's Netlify link
         try {
           const siteInfo = execSync('netlify api getSite --data \'{}\' 2>/dev/null', {
             encoding: 'utf8'
           });
           const site = JSON.parse(siteInfo);
           siteId = site.id;
-          console.log(`📁 Using current directory site: ${site.name}`);
+          console.log(`✅ Found linked Netlify site: ${site.name}`);
         } catch (e) {
-          console.error('❌ No site specified and not in a Netlify project directory');
-          return;
+          // Not linked to Netlify
+          
+          // If we have repo info, try to find a matching Netlify site
+          if (repoInfo) {
+            console.log(`🔍 Looking for Netlify site connected to ${repoInfo.owner}/${repoInfo.name}...`);
+            
+            const allSites = await getAllSites();
+            const matchingSite = allSites.find(site => {
+              if (site.repo_url) {
+                return site.repo_url.includes(`${repoInfo.owner}/${repoInfo.name}`);
+              }
+              return false;
+            });
+            
+            if (matchingSite) {
+              siteId = matchingSite.id;
+              console.log(`✅ Found matching Netlify site: ${matchingSite.name}`);
+            } else {
+              console.log(`\n⚠️  No Netlify site found for this repository.`);
+              console.log(`\nOptions:`);
+              console.log(`1. Create a new Netlify site: netlify init`);
+              console.log(`2. Link to existing site: netlify link`);
+              console.log(`3. Specify site directly: netlify-subdomain add ${subdomain} ${baseDomain} <site-name>`);
+              console.log(`\nTip: You can see all your sites with: netlify-subdomain list-sites`);
+              return;
+            }
+          } else {
+            console.error('❌ No site specified and not in a Netlify project directory');
+            console.log('\nTo use this command, either:');
+            console.log('1. Run from a directory linked to Netlify');
+            console.log('2. Specify the site: netlify-subdomain add subdomain domain site-name');
+            return;
+          }
         }
       }
       
