@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.1] - 2025-06-28
+
+### Fixed
+- Handle sites without custom domains by setting the subdomain as the primary custom domain
+- Fix "You cannot update domain aliases while primary custom domain is not set" error
+- Only show success message when domain is actually added successfully
+- Prevent misleading success messages when domain alias fails
+
+### Changed
+- Improved logic to automatically detect whether to set custom_domain or domain_alias
+- Better error handling and user feedback
+
 ## [1.1.0] - 2024-12-28
 
 ### Added

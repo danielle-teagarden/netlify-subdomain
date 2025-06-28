@@ -110,6 +110,39 @@ async function addDomainToSite(domain, siteId) {
         encoding: 'utf8'
       }));
       
+      // Check if site has a custom domain already
+      if (!siteData.custom_domain) {
+        // If no custom domain, set this as the primary custom domain
+        console.log(`\n📝 Setting ${domain} as primary custom domain...`);
+        
+        const customDomainResult = execSync(`curl -s -w "\\nHTTP_STATUS:%{http_code}" -X PATCH -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" -d '{"custom_domain":"${domain}"}' https://api.netlify.com/api/v1/sites/${siteId}`, {
+          encoding: 'utf8'
+        });
+        
+        const customStatusMatch = customDomainResult.match(/HTTP_STATUS:(\d+)/);
+        const customHttpStatus = customStatusMatch ? parseInt(customStatusMatch[1]) : 0;
+        
+        if (customHttpStatus === 200) {
+          console.log(`✅ Successfully added ${domain}!`);
+          console.log(`🌐 Your site will be available at: https://${domain}`);
+          console.log('\nNote: DNS propagation may take a few minutes.');
+          
+          // Update recent domains in config
+          const config = loadConfig();
+          config.recentDomains = config.recentDomains || [];
+          if (!config.recentDomains.includes(domain)) {
+            config.recentDomains.unshift(domain);
+            config.recentDomains = config.recentDomains.slice(0, 10); // Keep last 10
+          }
+          saveConfig(config);
+          
+          return; // Exit early - we're done!
+        } else {
+          console.log(`⚠️  Failed to set custom domain. Status: ${customHttpStatus}`);
+          // Continue to try domain alias approach
+        }
+      }
+      
       // Add new domain to existing aliases
       const currentAliases = siteData.domain_aliases || [];
       if (!currentAliases.includes(domain)) {
@@ -151,15 +184,25 @@ async function addDomainToSite(domain, siteId) {
         console.log(`   1. Go to https://app.netlify.com/sites/${siteId}/settings/domain`);
         console.log(`   2. Click "Add domain alias"`);
         console.log(`   3. Enter: ${domain}`);
+      } else {
+        // Success!
+        console.log(`✅ Successfully added ${domain}!`);
+        console.log(`🌐 Your site will be available at: https://${domain}`);
+        console.log('\nNote: DNS propagation may take a few minutes.');
+        
+        // Update recent domains in config
+        const config = loadConfig();
+        config.recentDomains = config.recentDomains || [];
+        if (!config.recentDomains.includes(domain)) {
+          config.recentDomains.unshift(domain);
+          config.recentDomains = config.recentDomains.slice(0, 10); // Keep last 10
+        }
+        saveConfig(config);
       }
     } catch (aliasError) {
       console.log(`⚠️  DNS record created but couldn't add domain alias to site`);
       console.log(`   You may need to add it manually in the Netlify UI`);
     }
-    
-    console.log(`✅ Successfully added ${domain}!`);
-    console.log(`🌐 Your site will be available at: https://${domain}`);
-    console.log('\nNote: DNS propagation may take a few minutes.');
     
   } catch (error) {
     console.error('❌ Error:', error.message);
